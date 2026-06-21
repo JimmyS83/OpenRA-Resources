@@ -49,14 +49,14 @@
 			<img alt="Go to the official OpenRA Website" src="/static/images/openra-net.svg" onerror='this.onerror = null; this.src="/static/images/openra-net-fallback.png"'>
 		</a>
 
-		<form id="quick-search" method="POST" action="/search/">{% csrf_token %}
+		<form id="quick-search" onsubmit="return handleSearch();">{% csrf_token %}
 			<input id="qsearch"
 				type="text"
 				title="Search maps by title, hash, description..."
-				value="Search..."
+				value="{% if selected_filter.search %}{{selected_filter.search}}{% else %}Search...{% endif %}"
 				onblur="this.value=!this.value?'Search...':this.value;"
 				onfocus="this.select()"
-				onclick="this.value='';"
+				onclick="if(this.value=='Search...')this.value='';"
 				name="qsearch">
 
 			<input class="btn"
@@ -67,6 +67,24 @@
 				name="searchsubmit"
 				alt="Search">
 		</form>
+		<script>
+		function handleSearch() {
+			var q = document.getElementById('qsearch').value.trim();
+			var onPanel = window.location.pathname.startsWith('/panel');
+			var onMaps = window.location.pathname.startsWith('/maps');
+			var params = new URLSearchParams((onMaps || onPanel) ? window.location.search : '');
+			params.delete('page');
+			if (q === '' || q === 'Search...') {
+				params.delete('search');
+			} else {
+				params.set('search', q);
+			}
+			var base = onPanel ? '/panel/' : '/maps/';
+			var qs = params.toString();
+			window.location.href = base + (qs ? '?' + qs : '');
+			return false;
+		}
+		</script>
 
 		<ul id="nav">
 			<li><a href="/"><span {% if request.path == '/' %}{{ 'class="nav-selected"' }}{% endif %}>Home</span></a></li>

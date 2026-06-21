@@ -53,7 +53,7 @@
 					{% if page == i %}
 					<span>{{ i }}</span>
 					{% else %}
-					<a href="/panel/page/{{i}}/">{{ i }}</a>
+					<a href="/panel/page/{{i}}/{% if panel_qs %}?{{panel_qs}}{% endif %}">{{ i }}</a>
 					{% endif %}
 					{% else %}
 					{% if i < page %}

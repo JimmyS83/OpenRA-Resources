@@ -1,58 +1,48 @@
 from django.test import Client, override_settings
-import factory
 
-from openra import content
-from openra.tests.factories import MapsFactory, ScreenshotsFactory
 from openra.tests.routes.test_route_base import TestRouteBase
 
 
-class TestRouteHome(TestRouteBase):
+class TestRouteSearch(TestRouteBase):
 
     _route = '/search/mymap'
 
-    def test_route_can_be_accessed_by_any_user(self):
-        self.assert_contains(
-            self.get(),
-            [
-                'Nothing found'
-            ],
-            title=content.titles['search']
-        )
+    def test_search_with_query_redirects_to_maps(self):
+        """GET /search/<query> redirects to /maps/?search=<query>"""
+        response = self.get()
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/maps/?search=mymap', response.url)
+
+    def test_search_query_is_url_encoded(self):
+        """Special characters in query are properly encoded"""
+        response = self.get(route='/search/hello world')
+        self.assertEqual(302, response.status_code)
+        self.assertIn('search=', response.url)
+
+    def test_get_without_query_redirects_home(self):
+        """GET /search/ with no query redirects to /"""
+        response = Client().get('/search/')
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/', response.url)
+
+    def test_post_with_query_redirects_to_maps(self):
+        """POST to /search/ with qsearch value redirects to /maps/?search=<query>"""
+        response = self.post(route='/search/', data={'qsearch': 'mymap'})
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/maps/?search=mymap', response.url)
+
+    def test_post_with_empty_query_redirects_home(self):
+        """POST to /search/ with empty qsearch redirects to /"""
+        response = self.post(route='/search/', data={'qsearch': ''})
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/', response.url)
+
+    def test_post_with_whitespace_query_redirects_home(self):
+        """POST to /search/ with whitespace-only qsearch redirects to /"""
+        response = self.post(route='/search/', data={'qsearch': '   '})
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/', response.url)
 
     @override_settings(SITE_MAINTENANCE=True)
     def test_route_shows_maintenance_page(self):
-        self.assert_is_maintenance(
-            self.get()
-        )
-
-    def test_route_redirects_when_no_query(self):
-        response = Client().get('/search/')
-
-        self.assertEquals(
-            302,
-            response.status_code
-        )
-
-        self.assertEquals(
-            '/',
-            response.url
-        )
-
-    def test_route_shows_search_result_maps(self):
-        maps = [
-            MapsFactory(map_hash='mymap'),
-            MapsFactory(title='mymap'),
-            MapsFactory(info='mymap'),
-            MapsFactory(description='mymap'),
-            MapsFactory(author='mymap')
-        ]
-
-        titles = []
-
-        for map_model in maps:
-            titles.append(map_model.title)
-
-        self.assert_contains(
-            self.get(),
-            titles
-        )
+        self.assert_is_maintenance(self.get())

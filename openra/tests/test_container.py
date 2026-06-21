@@ -10,7 +10,6 @@ from openra.services.github import Github
 
 from openra.services.log import Log
 from openra.services.map_file_repository import MapFileRepository
-from openra.services.map_search import MapSearch
 from openra.services.utility import Utility
 
 
@@ -50,8 +49,3 @@ class TestContainer(TestCase):
     def test_utility_can_be_injected(self,
                                      utility: Utility = Provide['utility']):
         self.assertIsInstance(utility, Utility)
-
-    @inject
-    def test_map_search_can_be_injected(self,
-                                        map_search: MapSearch = Provide['map_search']):
-        self.assertIsInstance(map_search, MapSearch)

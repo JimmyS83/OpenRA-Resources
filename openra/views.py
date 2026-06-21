@@ -20,7 +20,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseRedirect, Http404
 from django.utils import timezone
 
-from django.db.models import F
+from django.db.models import Q, F
 from django.contrib.auth.models import User
 from allauth.socialaccount.models import SocialAccount
 from openra import content, handlers, misc
@@ -29,7 +29,6 @@ from openra.classes.exceptions import ExceptionBase
 from openra.classes.screenshot_resource import ScreenshotResource
 from openra.models import Maps, Lints, Screenshots, Reports, Rating, Comments, UnsubscribeComments
 from openra.services.map_file_repository import MapFileRepository
-from openra.services.map_search import MapSearch
 from openra.classes.pagination import Pagination
 from openra.services.screenshot_repository import ScreenshotRepository
 from openra.services.openra_master import OpenraMaster
@@ -129,39 +128,38 @@ def feed(request):
     )
 
 
-@inject
-def search(request, search_query="",
-           map_search: MapSearch = Provide['map_search']
-           ):
+def search(request, search_query=""):
 
     if not search_query:
         if request.method == 'POST':
-            if request.POST.get('qsearch', "").strip() == "":
+            q = request.POST.get('qsearch', "").strip()
+            if q == "":
                 return HttpResponseRedirect('/')
-            return HttpResponseRedirect('/search/' + request.POST.get('qsearch', "").strip())
+            return HttpResponseRedirect('/maps/?' + urlencode({'search': q}))
         else:
             return HttpResponseRedirect('/')
 
-    return standard_view(
-        request,
-        'search.html',
-        {
-            'request': request,
-            'title': content.titles['search'],
-            'search_results': map_search.run(search_query),
-            'search_request': search_query,
-        }
-    )
+    # Legacy /search/<query> URLs — redirect to unified maps page
+    return HttpResponseRedirect('/maps/?' + urlencode({'search': search_query}))
 
 
 def ControlPanel(request, page=1):
     if not request.user.is_authenticated():
         return HttpResponseRedirect('/login/')
 
+    search_q = request.GET.get('search', '').strip()[:100]
+
     perPage = 20
     slice_start = perPage * int(page) - perPage
     slice_end = perPage * int(page)
     mapObject = Maps.objects.filter(user_id=request.user.id).filter(next_rev=0).order_by('-posted')
+    if search_q:
+        mapObject = mapObject.filter(
+            Q(map_hash=search_q) |
+            Q(title__icontains=search_q) |
+            Q(info__icontains=search_q) |
+            Q(description__icontains=search_q)
+        )
     amount = mapObject.count()
     rowsRange = int(math.ceil(amount / float(perPage)))   # amount of rows
     mapObject = mapObject[slice_start:slice_end]
@@ -180,6 +178,8 @@ def ControlPanel(request, page=1):
         'range': [i + 1 for i in range(rowsRange)],
         'amount_maps': amount,
         'comments': comments,
+        'selected_filter': {'search': search_q},
+        'panel_qs': re.sub(r'page=\d+&?', '', request.META['QUERY_STRING']).strip('&'),
     }
     return HttpResponse(template.render(template_args, request))
 
